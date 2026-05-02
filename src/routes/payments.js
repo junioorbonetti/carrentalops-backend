@@ -43,7 +43,7 @@ router.post('/', auth, async (req, res) => {
         type,
         status: status || 'paid',
         notes,
-        paidAt: paidAt ? new Date(paidAt) : new Date(),
+        paidAt: paidAt ? new Date(paidAt + "T12:00:00.000Z") : new Date(),
       },
       include: { customer: true, vehicle: true },
     });
@@ -62,7 +62,7 @@ router.put('/:id', auth, async (req, res) => {
       data: {
         amount: amount ? Number(amount) : undefined,
         method, type, status, notes,
-        paidAt: paidAt ? new Date(paidAt) : undefined,
+        paidAt: paidAt ? new Date(paidAt + "T12:00:00.000Z") : undefined,
       },
     });
     res.json(payment);

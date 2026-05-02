@@ -84,3 +84,27 @@ router.get('/pending-customers', auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// GET /api/reports/monthly?year=2026&month=4
+router.get("/monthly", auth, async (req, res) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const month = Number(req.query.month) || new Date().getMonth() + 1;
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+
+    const payments = await prisma.payment.findMany({
+      where: { paidAt: { gte: start, lt: end } },
+      include: { customer: true },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    const totalRevenue = payments.reduce((s, p) => s + p.amount, 0);
+    const totalPaid = payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+    const totalPending = payments.filter(p => p.status !== 'paid').reduce((s, p) => s + p.amount, 0);
+
+    res.json({ totalRevenue, totalPaid, totalPending, paymentCount: payments.length, payments });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
