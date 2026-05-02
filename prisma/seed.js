@@ -12,7 +12,7 @@ async function main() {
   });
 
   console.log('✓ Seed complete');
-  console.log('  Email: junioor.bonetti@gmail.com);
+  console.log('  Email: junioor.bonetti@gmail.com');
   console.log('  Password: erika1011');
 }
 
