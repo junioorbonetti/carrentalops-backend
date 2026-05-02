@@ -6,13 +6,13 @@ const prisma = new PrismaClient();
 async function main() {
   const password = await bcrypt.hash('erika1011', 10);
   await prisma.user.upsert({
-    where: { email: 'juniorbonetti' },
+    where: { email: 'junioor.bonetti@gmail.com' },
     update: {},
-    create: { email: 'juniorbonetti', password, name: 'Junior Bonetti' },
+    create: { email: 'junioor.bonetti@gmail.com', password, name: 'Junior Bonetti' },
   });
 
   console.log('✓ Seed complete');
-  console.log('  Email: juniorbonetti);
+  console.log('  Email: junioor.bonetti@gmail.com);
   console.log('  Password: erika1011');
 }
 
