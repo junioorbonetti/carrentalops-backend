@@ -49,7 +49,7 @@ router.get('/:id', auth, async (req, res) => {
 // POST /api/vehicles
 router.post('/', auth, upload.single('photo'), async (req, res) => {
   try {
-    const { brand, model, year, plate, vin, color, mileage, weeklyRate, notes } = req.body;
+    const { brand, model, year, plate, vin, color, mileage, weeklyRate, notes, docExpiry } = req.body;
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -63,6 +63,7 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
         weeklyRate: Number(weeklyRate),
         notes,
         photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
+        docExpiry: docExpiry ? new Date(docExpiry) : null,
       },
     });
     res.status(201).json(vehicle);
@@ -75,10 +76,11 @@ router.post('/', auth, upload.single('photo'), async (req, res) => {
 // PUT /api/vehicles/:id
 router.put('/:id', auth, upload.single('photo'), async (req, res) => {
   try {
-    const { brand, model, year, plate, vin, color, status, mileage, weeklyRate, notes } = req.body;
+    const { brand, model, year, plate, vin, color, status, mileage, weeklyRate, notes, docExpiry } = req.body;
     const data = {
       brand, model, plate, vin, color, status, notes,
       year: year ? Number(year) : undefined,
+      docExpiry: docExpiry ? new Date(docExpiry) : null,
       mileage: mileage ? Number(mileage) : undefined,
       weeklyRate: weeklyRate ? Number(weeklyRate) : undefined,
     };

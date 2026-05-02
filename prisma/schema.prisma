@@ -28,6 +28,7 @@ model Vehicle {
   weeklyRate     Float
   notes          String?
   photoUrl       String?
+  docExpiry      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   rentals        Rental[]

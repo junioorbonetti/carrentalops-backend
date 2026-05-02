@@ -22,6 +22,7 @@ router.get('/', auth, async (req, res) => {
       monthPayments,
       pendingMaintenance,
       overdueMaintenance,
+      expiringDocs,
     ] = await Promise.all([
       prisma.vehicle.count({ where: { status: { not: 'inactive' } } }),
       prisma.vehicle.count({ where: { status: 'available' } }),
@@ -37,6 +38,16 @@ router.get('/', auth, async (req, res) => {
           status: { not: 'completed' },
           nextMaintenanceDate: { lt: now },
         },
+      }),
+      prisma.vehicle.findMany({
+        where: {
+          docExpiry: {
+            gte: now,
+            lte: new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()),
+          },
+          status: { not: 'inactive' },
+        },
+        select: { id: true, brand: true, model: true, plate: true, docExpiry: true },
       }),
     ]);
 
@@ -56,6 +67,7 @@ router.get('/', auth, async (req, res) => {
       monthRevenue,
       pendingMaintenance,
       overdueMaintenance,
+      expiringDocs,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
