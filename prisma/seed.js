@@ -8,12 +8,12 @@ async function main() {
   await prisma.user.upsert({
     where: { email: 'juniorbonetti' },
     update: {},
-    create: { email: 'demo@carrentalops.net', password, name: 'Junior Bonetti' },
+    create: { email: 'juniorbonetti', password, name: 'Junior Bonetti' },
   });
 
   console.log('✓ Seed complete');
-  console.log('  Email: demo@carrentalops.net');
-  console.log('  Password: fleet123');
+  console.log('  Email: juniorbonetti);
+  console.log('  Password: erika1011');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
