@@ -77,7 +77,7 @@ router.post('/', auth, async (req, res) => {
           customerId: Number(customerId),
           vehicleId: Number(vehicleId),
           startDate: new Date(startDate),
-          expectedReturn: new Date(expectedReturn),
+          expectedReturn: expectedReturn ? new Date(expectedReturn) : null,
           weeklyRate: Number(weeklyRate),
           deposit: Number(deposit) || 0,
           notes,
