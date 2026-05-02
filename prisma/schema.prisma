@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+}
+
+model Vehicle {
+  id             Int           @id @default(autoincrement())
+  brand          String
+  model          String
+  year           Int
+  plate          String        @unique
+  vin            String?
+  color          String
+  status         String        @default("available") // available, rented, maintenance, inactive
+  mileage        Int           @default(0)
+  weeklyRate     Float
+  notes          String?
+  photoUrl       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  rentals        Rental[]
+  maintenances   Maintenance[]
+  payments       Payment[]
+}
+
+model Customer {
+  id              Int       @id @default(autoincrement())
+  fullName        String
+  phone           String
+  email           String?
+  address         String?
+  licenseNumber   String
+  licenseExpiry   DateTime
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  rentals         Rental[]
+  payments        Payment[]
+}
+
+model Rental {
+  id               Int       @id @default(autoincrement())
+  customerId       Int
+  vehicleId        Int
+  startDate        DateTime
+  expectedReturn   DateTime?
+  actualReturn     DateTime?
+  weeklyRate       Float
+  deposit          Float     @default(0)
+  status           String    @default("active") // active, finished, late, cancelled
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  customer         Customer  @relation(fields: [customerId], references: [id])
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
+  payments         Payment[]
+}
+
+model Payment {
+  id         Int       @id @default(autoincrement())
+  rentalId   Int?
+  customerId Int
+  vehicleId  Int?
+  amount     Float
+  paidAt     DateTime  @default(now())
+  method     String    // cash, zelle, card, transfer, other
+  type       String    // rental, deposit, fine, maintenance, other
+  status     String    @default("paid") // paid, pending, late
+  notes      String?
+  createdAt  DateTime  @default(now())
+  rental     Rental?   @relation(fields: [rentalId], references: [id])
+  customer   Customer  @relation(fields: [customerId], references: [id])
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id])
+}
+
+model Maintenance {
+  id                Int       @id @default(autoincrement())
+  vehicleId         Int
+  type              String    // preventive, corrective, cleaning, tires, oil, brakes, battery, other
+  date              DateTime
+  mileage           Int?
+  cost              Float     @default(0)
+  status            String    @default("pending") // pending, in_progress, completed
+  shop              String?
+  notes             String?
+  nextMaintenanceDate DateTime?
+  nextMileage       Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  vehicle           Vehicle   @relation(fields: [vehicleId], references: [id])
+}
