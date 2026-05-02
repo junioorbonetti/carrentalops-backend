@@ -42,7 +42,7 @@ model Customer {
   email           String?
   address         String?
   licenseNumber   String
-  licenseExpiry   DateTime
+  licenseExpiry   DateTime?
   notes           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

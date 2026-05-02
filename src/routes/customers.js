@@ -38,7 +38,7 @@ router.post('/', auth, async (req, res) => {
     const { fullName, phone, email, address, licenseNumber, licenseExpiry, notes } = req.body;
 
     const customer = await prisma.customer.create({
-      data: { fullName, phone, email, address, licenseNumber, licenseExpiry: new Date(licenseExpiry), notes },
+      data: { fullName, phone, email, address, licenseNumber, licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null, notes },
     });
     res.status(201).json(customer);
   } catch (e) {
@@ -54,7 +54,7 @@ router.put('/:id', auth, async (req, res) => {
       where: { id: Number(req.params.id) },
       data: {
         fullName, phone, email, address, licenseNumber, notes,
-        licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : undefined,
+        licenseExpiry: licenseExpiry ? new Date(licenseExpiry) : null,
       },
     });
     res.json(customer);
