@@ -10,6 +10,7 @@ const paymentRoutes = require('./src/routes/payments');
 const maintenanceRoutes = require('./src/routes/maintenance');
 const dashboardRoutes = require('./src/routes/dashboard');
 const reportRoutes = require('./src/routes/reports');
+const weeklyPaymentRoutes = require('./src/routes/weeklyPayments');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +27,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/weekly-payments', weeklyPaymentRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

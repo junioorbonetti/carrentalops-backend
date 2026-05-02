@@ -63,7 +63,7 @@ router.get('/:id', auth, async (req, res) => {
 // POST /api/rentals
 router.post('/', auth, async (req, res) => {
   try {
-    const { customerId, vehicleId, startDate, expectedReturn, weeklyRate, deposit, notes } = req.body;
+    const { customerId, vehicleId, startDate, expectedReturn, weeklyRate, deposit, notes, paymentDay } = req.body;
     if (!customerId || !vehicleId || !startDate || !weeklyRate)
       return res.status(400).json({ error: 'Missing required fields' });
 
@@ -81,6 +81,7 @@ router.post('/', auth, async (req, res) => {
           weeklyRate: Number(weeklyRate),
           deposit: Number(deposit) || 0,
           notes,
+          paymentDay: paymentDay || null,
         },
         include: { customer: true, vehicle: true },
       }),
@@ -115,7 +116,7 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/rentals/:id
 router.put('/:id', auth, async (req, res) => {
   try {
-    const { status, actualReturn, expectedReturn, notes, startDate, weeklyRate, deposit } = req.body;
+    const { status, actualReturn, expectedReturn, notes, startDate, weeklyRate, deposit, paymentDay } = req.body;
     const rental = await prisma.rental.findUnique({ where: { id: Number(req.params.id) } });
     if (!rental) return res.status(404).json({ error: 'Rental not found' });
 
@@ -126,6 +127,7 @@ router.put('/:id', auth, async (req, res) => {
     if (startDate) data.startDate = new Date(startDate);
     if (weeklyRate !== undefined) data.weeklyRate = Number(weeklyRate);
     if (deposit !== undefined) data.deposit = Number(deposit);
+    if (paymentDay !== undefined) data.paymentDay = paymentDay || null;
 
     const updated = await prisma.rental.update({
       where: { id: Number(req.params.id) },

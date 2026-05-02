@@ -61,6 +61,7 @@ model Rental {
   weeklyRate       Float
   deposit          Float     @default(0)
   status           String    @default("active") // active, finished, late, cancelled
+  paymentDay       String?   // monday, tuesday, wednesday, thursday, friday, saturday, sunday
   notes            String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
