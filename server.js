@@ -11,9 +11,13 @@ const maintenanceRoutes = require('./src/routes/maintenance');
 const dashboardRoutes = require('./src/routes/dashboard');
 const reportRoutes = require('./src/routes/reports');
 const weeklyPaymentRoutes = require('./src/routes/weeklyPayments');
+const trackingRoutes = require('./src/routes/tracking');
+const trackerRoutes  = require('./src/routes/trackers');
+const { server: gpsServer } = require('./src/services/gpsServer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const GPS_PORT = process.env.GPS_PORT || 8821;
 
 app.use(cors());
 app.use(express.json());
@@ -28,6 +32,8 @@ app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/weekly-payments', weeklyPaymentRoutes);
+app.use('/api/tracking', trackingRoutes);
+app.use('/api/trackers',  trackerRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
@@ -36,4 +42,8 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`CarRentalOps backend running on port ${PORT}`);
+});
+
+gpsServer.listen(GPS_PORT, '0.0.0.0', () => {
+  console.log(`GPS TCP server listening on port ${GPS_PORT}`);
 });
