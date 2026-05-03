@@ -2,18 +2,15 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const auth = require('../middleware/auth');
 const { sendLeadConfirmation } = require('../services/email');
-
 const router = express.Router();
 const prisma = new PrismaClient();
 
 router.post('/', async (req, res) => {
   try {
-    const { fullName, email, phone, licenseNumber, dlPhone, hasWhatsapp, whatsappNumber, vehicleId } = req.body;
-
+    const { fullName, email, phone, licenseNumber, hasWhatsapp, whatsappNumber, vehicleId } = req.body;
     if (!fullName || !email || !phone || !licenseNumber || !vehicleId) {
       return res.status(400).json({ error: 'Campos obrigatórios faltando.' });
     }
-
     const vehicle = await prisma.vehicle.findUnique({ where: { id: Number(vehicleId) } });
     if (!vehicle) return res.status(404).json({ error: 'Veículo não encontrado.' });
     if (vehicle.status !== 'available') return res.status(409).json({ error: 'Este veículo não está disponível.' });
@@ -24,7 +21,6 @@ router.post('/', async (req, res) => {
         email,
         phone,
         licenseNumber,
-        dlPhone: dlPhone || null,
         hasWhatsapp: hasWhatsapp === true || hasWhatsapp === 'true',
         whatsappNumber: whatsappNumber || null,
         vehicleId: Number(vehicleId),
@@ -35,7 +31,6 @@ router.post('/', async (req, res) => {
     sendLeadConfirmation(lead, lead.vehicle).catch(err =>
       console.error('Erro ao enviar email de confirmação:', err)
     );
-
     res.status(201).json(lead);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -95,7 +90,6 @@ router.post('/:id/convert', auth, async (req, res) => {
         email: lead.email,
         phone: lead.phone,
         licenseNumber: lead.licenseNumber,
-        dlPhone: lead.dlPhone,
         hasWhatsapp: lead.hasWhatsapp,
         whatsappNumber: lead.whatsappNumber,
       },
