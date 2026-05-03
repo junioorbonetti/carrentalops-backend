@@ -1,59 +1,63 @@
-/**
- * tracking.js
- * Endpoints de posição GPS por veículo — live, histórico e relay via vehicleId
- */
-
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const authenticateToken = require('../middleware/auth');
-const { sendCommand, isOnline } = require('../services/gpsServer');
+const { getDevices, getAllPositions, getHistory } = require('../services/traccar');
 
-// ─── Última posição de um veículo ────────────────────────────────────────────
+// Última posição de um veículo
 router.get('/vehicles/:id/live', authenticateToken, async (req, res) => {
   try {
     const tracker = await prisma.tracker.findUnique({
       where: { vehicleId: parseInt(req.params.id) }
     });
-    if (!tracker) return res.status(404).json({ error: 'Nenhum tracker vinculado a este veículo' });
+    if (!tracker) return res.status(404).json({ error: 'Nenhum tracker vinculado' });
 
-    const last = await prisma.vehicleLocation.findFirst({
-      where: { trackerId: tracker.id },
-      orderBy: { timestamp: 'desc' }
-    });
+    const positions = await getAllPositions();
+    const devices = await getDevices();
+    const device = devices.find(d => d.uniqueId === tracker.id);
+    if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado no Traccar' });
+
+    const position = positions.find(p => p.deviceId === device.id);
 
     res.json({
       trackerId: tracker.id,
-      online: isOnline(tracker.id),
-      location: last || null
+      online: device.status === 'online',
+      lastUpdate: device.lastUpdate,
+      location: position ? {
+        lat: position.latitude,
+        lng: position.longitude,
+        speed: position.speed,
+        ignition: position.attributes?.ignition || false,
+        timestamp: position.fixTime
+      } : null
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── Histórico de posições de um veículo ─────────────────────────────────────
-// Query params: from (ISO date), to (ISO date), limit (default 500)
+// Histórico de posições
 router.get('/vehicles/:id/history', authenticateToken, async (req, res) => {
-  const { from, to, limit = 500 } = req.query;
+  const { from, to } = req.query;
   try {
     const tracker = await prisma.tracker.findUnique({
       where: { vehicleId: parseInt(req.params.id) }
     });
-    if (!tracker) return res.status(404).json({ error: 'Nenhum tracker vinculado a este veículo' });
+    if (!tracker) return res.status(404).json({ error: 'Nenhum tracker vinculado' });
 
-    const locations = await prisma.vehicleLocation.findMany({
-      where: {
-        trackerId: tracker.id,
-        timestamp: {
-          gte: from ? new Date(from) : undefined,
-          lte: to ? new Date(to) : undefined
-        }
-      },
-      orderBy: { timestamp: 'asc' },
-      take: Math.min(parseInt(limit), 2000)
-    });
+    const devices = await getDevices();
+    const device = devices.find(d => d.uniqueId === tracker.id);
+    if (!device) return res.status(404).json({ error: 'Dispositivo não encontrado no Traccar' });
+
+    const positions = await getHistory(device.id, from, to);
+    const locations = positions.map(p => ({
+      lat: p.latitude,
+      lng: p.longitude,
+      speed: p.speed,
+      ignition: p.attributes?.ignition || false,
+      timestamp: p.fixTime
+    }));
 
     res.json({ trackerId: tracker.id, count: locations.length, locations });
   } catch (err) {
@@ -61,54 +65,42 @@ router.get('/vehicles/:id/history', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Relay via vehicleId (atalho) ─────────────────────────────────────────────
-// Body: { action: "cut" | "release" }
+// Relay via vehicleId
 router.post('/vehicles/:id/relay', authenticateToken, async (req, res) => {
-  const { action } = req.body;
-  if (!['cut', 'release'].includes(action)) {
-    return res.status(400).json({ error: 'action deve ser "cut" ou "release"' });
-  }
-
-  try {
-    const tracker = await prisma.tracker.findUnique({
-      where: { vehicleId: parseInt(req.params.id) }
-    });
-    if (!tracker) return res.status(404).json({ error: 'Nenhum tracker vinculado a este veículo' });
-    if (!isOnline(tracker.id)) {
-      return res.status(503).json({ error: 'Dispositivo offline' });
-    }
-
-    const command = action === 'cut' ? 'RELAY,1#' : 'RELAY,0#';
-    sendCommand(tracker.id, command);
-
-    await prisma.trackerCommand.create({
-      data: { trackerId: tracker.id, command, action, sentBy: req.user.id }
-    });
-
-    res.json({ success: true, action });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.status(503).json({ error: 'Relay via Traccar ainda não implementado' });
 });
 
-// ─── Live de todos os veículos com tracker ────────────────────────────────────
+// Fleet — posição de toda a frota
 router.get('/fleet', authenticateToken, async (req, res) => {
   try {
     const trackers = await prisma.tracker.findMany({
       where: { active: true, vehicleId: { not: null } },
       include: {
-        vehicle: { select: { id: true, plate: true, brand: true, model: true, color: true, status: true } },
-        locations: { orderBy: { timestamp: 'desc' }, take: 1 }
+        vehicle: { select: { id: true, plate: true, brand: true, model: true, color: true, status: true } }
       }
     });
 
-    const fleet = trackers.map(t => ({
-      trackerId: t.id,
-      online: isOnline(t.id),
-      vehicle: t.vehicle,
-      lastLocation: t.locations[0] || null,
-      lastSeen: t.lastSeen
-    }));
+    const devices = await getDevices();
+    const positions = await getAllPositions();
+
+    const fleet = trackers.map(tracker => {
+      const device = devices.find(d => d.uniqueId === tracker.id);
+      const position = device ? positions.find(p => p.deviceId === device.id) : null;
+
+      return {
+        trackerId: tracker.id,
+        online: device?.status === 'online',
+        lastSeen: device?.lastUpdate,
+        vehicle: tracker.vehicle,
+        lastLocation: position ? {
+          lat: position.latitude,
+          lng: position.longitude,
+          speed: position.speed,
+          ignition: position.attributes?.ignition || false,
+          timestamp: position.fixTime
+        } : null
+      };
+    });
 
     res.json(fleet);
   } catch (err) {
