@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+const publicRoutes = require('./src/routes/public');
+const leadRoutes = require('./src/routes/leads');
 const authRoutes = require('./src/routes/auth');
 const vehicleRoutes = require('./src/routes/vehicles');
 const customerRoutes = require('./src/routes/customers');
@@ -34,6 +36,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/weekly-payments', weeklyPaymentRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/trackers',  trackerRoutes);
+app.use('/api/public', publicRoutes);                     
+app.use('/api/leads', leadRoutes);                         
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
