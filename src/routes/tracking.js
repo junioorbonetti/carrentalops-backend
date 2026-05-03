@@ -76,7 +76,7 @@ router.get('/fleet', authenticateToken, async (req, res) => {
     const trackers = await prisma.tracker.findMany({
       where: {
         active: true,
-        NOT: { vehicleId: null }
+        vehicleId: { gt: 0 }
       },
       include: {
         vehicle: { select: { id: true, plate: true, brand: true, model: true, color: true, status: true } }
