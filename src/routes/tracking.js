@@ -74,7 +74,10 @@ router.post('/vehicles/:id/relay', authenticateToken, async (req, res) => {
 router.get('/fleet', authenticateToken, async (req, res) => {
   try {
     const trackers = await prisma.tracker.findMany({
-      where: { active: true, vehicleId: { not: null } },
+      where: {
+        active: true,
+        NOT: { vehicleId: null }
+      },
       include: {
         vehicle: { select: { id: true, plate: true, brand: true, model: true, color: true, status: true } }
       }
