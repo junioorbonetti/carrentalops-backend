@@ -23,7 +23,7 @@ model Vehicle {
   plate          String        @unique
   vin            String?
   color          String
-  status         String        @default("available") // available, rented, maintenance, inactive
+  status         String        @default("available")
   mileage        Int           @default(0)
   weeklyRate     Float
   notes          String?
@@ -34,8 +34,89 @@ model Vehicle {
   rentals        Rental[]
   maintenances   Maintenance[]
   payments       Payment[]
-  tracker        Tracker?       // ← adiciona esta linha
-  leads          LeadRequest[]
+  tracker        Tracker?
+}
+
+model Customer {
+  id              Int       @id @default(autoincrement())
+  fullName        String
+  phone           String
+  email           String?
+  address         String?
+  licenseNumber   String
+  licenseExpiry   DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  rentals         Rental[]
+  payments        Payment[]
+}
+
+model Rental {
+  id               Int       @id @default(autoincrement())
+  customerId       Int
+  vehicleId        Int
+  startDate        DateTime
+  expectedReturn   DateTime?
+  actualReturn     DateTime?
+  weeklyRate       Float
+  deposit          Float     @default(0)
+  status           String    @default("active")
+  paymentDay       String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  customer         Customer  @relation(fields: [customerId], references: [id])
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
+  payments         Payment[]
+}
+
+model Payment {
+  id         Int       @id @default(autoincrement())
+  rentalId   Int?
+  customerId Int
+  vehicleId  Int?
+  amount     Float
+  paidAt     DateTime  @default(now())
+  method     String
+  type       String
+  status     String    @default("paid")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  rental     Rental?   @relation(fields: [rentalId], references: [id])
+  customer   Customer  @relation(fields: [customerId], references: [id])
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id])
+}
+
+model Maintenance {
+  id                  Int       @id @default(autoincrement())
+  vehicleId           Int
+  type                String
+  date                DateTime
+  mileage             Int?
+  cost                Float     @default(0)
+  status              String    @default("pending")
+  shop                String?
+  notes               String?
+  nextMaintenanceDate DateTime?
+  nextMileage         Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  vehicle             Vehicle   @relation(fields: [vehicleId], references: [id])
+}
+
+model Tracker {
+  id         String    @id
+  vehicleId  Int?      @unique
+  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id])
+  active     Boolean   @default(false)
+  label      String?
+  simNumber  String?
+  lastSeen   DateTime?
+  locations  VehicleLocation[]
+  commands   TrackerCommand[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model VehicleLocation {
@@ -61,108 +142,4 @@ model TrackerCommand {
   response   String?
   sentBy     Int
   createdAt  DateTime @default(now())
-}
-
-model Customer {
-  id              Int       @id @default(autoincrement())
-  fullName        String
-  phone           String
-  email           String?
-  address         String?
-  licenseNumber   String
-  licenseExpiry   DateTime?
-  dlPhone         String?   // ← adiciona esta linha
-  hasWhatsapp     Boolean   @default(false)
-  whatsappNumber  String?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  rentals         Rental[]
-  payments        Payment[]
-}
-
-model LeadRequest {
-  id             Int       @id @default(autoincrement())
-  fullName       String
-  email          String
-  phone          String
-  licenseNumber  String
-  dlPhone        String?
-  hasWhatsapp    Boolean   @default(false)
-  whatsappNumber String?
-  vehicleId      Int
-  status         String    @default("new") // new, contacted, converted, rejected
-  notes          String?
-  convertedToId  Int?      // id do Customer criado ao converter
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  vehicle        Vehicle   @relation(fields: [vehicleId], references: [id])
-}
-
-model Rental {
-  id               Int       @id @default(autoincrement())
-  customerId       Int
-  vehicleId        Int
-  startDate        DateTime
-  expectedReturn   DateTime?
-  actualReturn     DateTime?
-  weeklyRate       Float
-  deposit          Float     @default(0)
-  status           String    @default("active") // active, finished, late, cancelled
-  paymentDay       String?   // monday, tuesday, wednesday, thursday, friday, saturday, sunday
-  notes            String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  customer         Customer  @relation(fields: [customerId], references: [id])
-  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
-  payments         Payment[]
-}
-
-model Payment {
-  id         Int       @id @default(autoincrement())
-  rentalId   Int?
-  customerId Int
-  vehicleId  Int?
-  amount     Float
-  paidAt     DateTime  @default(now())
-  method     String    // cash, zelle, card, transfer, other
-  type       String    // rental, deposit, fine, maintenance, other
-  status     String    @default("paid") // paid, pending, late
-  notes      String?
-  createdAt  DateTime  @default(now())
-  rental     Rental?   @relation(fields: [rentalId], references: [id])
-  customer   Customer  @relation(fields: [customerId], references: [id])
-  vehicle    Vehicle?  @relation(fields: [vehicleId], references: [id])
-}
-
-model Maintenance {
-  id                Int       @id @default(autoincrement())
-  vehicleId         Int
-  type              String    // preventive, corrective, cleaning, tires, oil, brakes, battery, other
-  date              DateTime
-  mileage           Int?
-  cost              Float     @default(0)
-  status            String    @default("pending") // pending, in_progress, completed
-  shop              String?
-  notes             String?
-  nextMaintenanceDate DateTime?
-  nextMileage       Int?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  vehicle           Vehicle   @relation(fields: [vehicleId], references: [id])
-}
-
-model Tracker {
-  id            String            @id
-  vehicleId     Int               @unique
-  label         String?
-  simCard       String?
-  notes         String?
-  active        Boolean           @default(true)
-  lastSeen      DateTime?         // ← adiciona essa linha
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  vehicle       Vehicle           @relation(fields: [vehicleId], references: [id])
-  locations     VehicleLocation[]
-  commands      TrackerCommand[]
 }
