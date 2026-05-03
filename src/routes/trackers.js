@@ -1,37 +1,36 @@
-/**
- * trackers.js
- * Gerenciamento de dispositivos GPS (cadastro, vínculo com veículo, status)
- */
-
 const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const authenticateToken = require('../middleware/auth');
-const { sendCommand, isOnline } = require('../services/gpsServer');
+const {
+  getDevices,
+  createTraccarDevice,
+  deleteTraccarDevice,
+  sendCommand
+} = require('../services/traccar');
 
-// ─── Listar todos os trackers ─────────────────────────────────────────────────
+// Listar todos os trackers
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const trackers = await prisma.tracker.findMany({
       include: {
-        vehicle: {
-          select: { id: true, brand: true, model: true, year: true, plate: true, color: true }
-        },
-        locations: {
-          orderBy: { timestamp: 'desc' },
-          take: 1
-        }
+        vehicle: { select: { id: true, brand: true, model: true, year: true, plate: true, color: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const result = trackers.map(t => ({
-      ...t,
-      online: t.lastSeen ? (new Date() - new Date(t.lastSeen)) < 120000 : false,
-      lastLocation: t.locations[0] || null,
-      locations: undefined
-    }));
+    const devices = await getDevices();
+
+    const result = trackers.map(t => {
+      const device = devices.find(d => d.uniqueId === t.id);
+      return {
+        ...t,
+        online: device?.status === 'online',
+        lastSeen: device?.lastUpdate || t.lastSeen,
+        traccarId: device?.id || null
+      };
+    });
 
     res.json(result);
   } catch (err) {
@@ -39,8 +38,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Cadastrar novo tracker ───────────────────────────────────────────────────
-// Body: { imei, label, simNumber }
+// Cadastrar novo tracker
 router.post('/', authenticateToken, async (req, res) => {
   const { imei, label, simNumber } = req.body;
 
@@ -54,9 +52,16 @@ router.post('/', authenticateToken, async (req, res) => {
         id: imei.trim(),
         label: label || null,
         simNumber: simNumber || null,
-        active: false // fica inativo até vincular a um veículo
+        active: false
       }
     });
+
+    try {
+      await createTraccarDevice(imei.trim(), label || imei.trim());
+    } catch (traccarErr) {
+      console.warn('Erro ao criar no Traccar:', traccarErr.message);
+    }
+
     res.status(201).json(tracker);
   } catch (err) {
     if (err.code === 'P2002') {
@@ -66,8 +71,7 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Atualizar dados do tracker ───────────────────────────────────────────────
-// Body: { label, simNumber }
+// Atualizar dados do tracker
 router.patch('/:imei', authenticateToken, async (req, res) => {
   const { label, simNumber } = req.body;
   try {
@@ -81,14 +85,12 @@ router.patch('/:imei', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Vincular tracker a um veículo ────────────────────────────────────────────
-// Body: { vehicleId }
+// Vincular tracker a um veículo
 router.patch('/:imei/assign', authenticateToken, async (req, res) => {
   const { vehicleId } = req.body;
   if (!vehicleId) return res.status(400).json({ error: 'vehicleId obrigatório' });
 
   try {
-    // Remove vínculo anterior se o veículo já tinha outro tracker
     await prisma.tracker.updateMany({
       where: { vehicleId: parseInt(vehicleId), id: { not: req.params.imei } },
       data: { vehicleId: null, active: false }
@@ -105,7 +107,7 @@ router.patch('/:imei/assign', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Desvincular tracker de veículo ──────────────────────────────────────────
+// Desvincular tracker de veículo
 router.patch('/:imei/unassign', authenticateToken, async (req, res) => {
   try {
     const tracker = await prisma.tracker.update({
@@ -118,9 +120,14 @@ router.patch('/:imei/unassign', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Deletar tracker ──────────────────────────────────────────────────────────
+// Deletar tracker
 router.delete('/:imei', authenticateToken, async (req, res) => {
   try {
+    try {
+      await deleteTraccarDevice(req.params.imei);
+    } catch (traccarErr) {
+      console.warn('Erro ao remover do Traccar:', traccarErr.message);
+    }
     await prisma.tracker.delete({ where: { id: req.params.imei } });
     res.json({ success: true });
   } catch (err) {
@@ -128,42 +135,31 @@ router.delete('/:imei', authenticateToken, async (req, res) => {
   }
 });
 
-// ─── Controle de relé (cortar / liberar motor) ────────────────────────────────
-// Body: { action: "cut" | "release" }
+// Cortar / liberar motor
 router.post('/:imei/relay', authenticateToken, async (req, res) => {
   const { action } = req.body;
   if (!['cut', 'release'].includes(action)) {
     return res.status(400).json({ error: 'action deve ser "cut" ou "release"' });
   }
-
   try {
-    const tracker = await prisma.tracker.findUnique({ where: { id: req.params.imei } });
-    if (!tracker) return res.status(404).json({ error: 'Tracker não encontrado' });
-    if (!isOnline(req.params.imei)) {
-      return res.status(503).json({ error: 'Dispositivo offline — comando não enviado' });
-    }
+    const result = await sendCommand(req.params.imei, action);
 
-    // Comando J16: RELAY,1# = corta motor | RELAY,0# = libera motor
-    const command = action === 'cut' ? 'RELAY,1#' : 'RELAY,0#';
-    sendCommand(req.params.imei, command);
-
-    // Loga no banco
     await prisma.trackerCommand.create({
       data: {
         trackerId: req.params.imei,
-        command,
+        command: action === 'cut' ? 'engineStop' : 'engineResume',
         action,
         sentBy: req.user.id
       }
     });
 
-    res.json({ success: true, action, command });
+    res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ─── Histórico de comandos enviados ──────────────────────────────────────────
+// Histórico de comandos
 router.get('/:imei/commands', authenticateToken, async (req, res) => {
   try {
     const commands = await prisma.trackerCommand.findMany({
