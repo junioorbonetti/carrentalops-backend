@@ -4,74 +4,72 @@ const TRACCAR_URL = process.env.TRACCAR_URL || 'http://209.38.73.192:8082';
 const TRACCAR_USER = process.env.TRACCAR_USER;
 const TRACCAR_PASS = process.env.TRACCAR_PASS;
 
-const traccar = axios.create({
-  baseURL: TRACCAR_URL,
-  auth: { username: TRACCAR_USER, password: TRACCAR_PASS }
-});
+let sessionCookie = null;
 
-async function getDevices() {
-  const { data } = await traccar.get('/api/devices');
+async function getSession() {
+  if (sessionCookie) return sessionCookie;
+  const resp = await axios.post(`${TRACCAR_URL}/api/session`, 
+    `email=${encodeURIComponent(TRACCAR_USER)}&password=${encodeURIComponent(TRACCAR_PASS)}`,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  sessionCookie = resp.headers['set-cookie']?.[0]?.split(';')[0];
+  return sessionCookie;
+}
+
+async function traccarGet(path) {
+  const cookie = await getSession();
+  const { data } = await axios.get(`${TRACCAR_URL}${path}`, {
+    headers: { Cookie: cookie }
+  });
   return data;
 }
 
-async function getPosition(positionId) {
-  const { data } = await traccar.get(`/api/positions?id=${positionId}`);
-  return data[0] || null;
+async function traccarPost(path, body) {
+  const cookie = await getSession();
+  const { data } = await axios.post(`${TRACCAR_URL}${path}`, body, {
+    headers: { Cookie: cookie }
+  });
+  return data;
+}
+
+async function traccarDelete(path) {
+  const cookie = await getSession();
+  await axios.delete(`${TRACCAR_URL}${path}`, {
+    headers: { Cookie: cookie }
+  });
+}
+
+async function getDevices() {
+  return traccarGet('/api/devices');
 }
 
 async function getAllPositions() {
-  const { data } = await traccar.get('/api/positions');
-  return data;
+  return traccarGet('/api/positions');
 }
 
 async function getHistory(deviceId, from, to) {
-  const { data } = await traccar.get('/api/positions', {
-    params: {
-      deviceId,
-      from: from || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      to: to || new Date().toISOString()
-    }
-  });
-  return data;
+  const f = from || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const t = to || new Date().toISOString();
+  return traccarGet(`/api/positions?deviceId=${deviceId}&from=${f}&to=${t}`);
 }
 
 async function createTraccarDevice(imei, name) {
-  const { data } = await traccar.post('/api/devices', {
-    name: name,
-    uniqueId: imei
-  });
-  return data;
+  return traccarPost('/api/devices', { name, uniqueId: imei });
 }
 
 async function deleteTraccarDevice(imei) {
   const devices = await getDevices();
   const device = devices.find(d => d.uniqueId === imei);
-  if (device) {
-    await traccar.delete(`/api/devices/${device.id}`);
-  }
+  if (device) await traccarDelete(`/api/devices/${device.id}`);
 }
 
 async function sendCommand(imei, action) {
   const devices = await getDevices();
   const device = devices.find(d => d.uniqueId === imei);
   if (!device) throw new Error('Dispositivo não encontrado no Traccar');
-  if (device.status !== 'online') throw new Error('Dispositivo offline — comando não enviado');
-
+  if (device.status !== 'online') throw new Error('Dispositivo offline');
   const type = action === 'cut' ? 'engineStop' : 'engineResume';
-  const { data } = await traccar.post('/api/commands/send', {
-    deviceId: device.id,
-    type,
-    attributes: {}
-  });
-  return data;
+  return traccarPost('/api/commands/send', { deviceId: device.id, type, attributes: {} });
 }
 
-module.exports = {
-  getDevices,
-  getPosition,
-  getAllPositions,
-  getHistory,
-  createTraccarDevice,
-  deleteTraccarDevice,
-  sendCommand
-};
+module.exports = { getDevices, getAllPositions, getHistory, createTraccarDevice, deleteTraccarDevice, sendCommand };
