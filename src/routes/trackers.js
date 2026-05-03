@@ -28,7 +28,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     const result = trackers.map(t => ({
       ...t,
-      online: isOnline(t.id),
+      online: t.lastSeen ? (new Date() - new Date(t.lastSeen)) < 120000 : false,
       lastLocation: t.locations[0] || null,
       locations: undefined
     }));
