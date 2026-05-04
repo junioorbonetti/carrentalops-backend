@@ -10,7 +10,7 @@ const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
 // GET /api/weekly-payments - returns active rentals grouped by payment day
 router.get('/', auth, async (req, res) => {
   try {
-    const today = new Date();
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
     const todayName = DAYS[today.getDay()];
 
     const rentals = await prisma.rental.findMany({
@@ -21,8 +21,8 @@ router.get('/', auth, async (req, res) => {
 
     // For each rental, check if this week's payment was already made
     const result = rentals.map(r => {
-      const startOfWeek = new Date(today);
-      startOfWeek.setDate(today.getDate() - today.getDay());
+      const startOfWeek = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
       startOfWeek.setHours(0, 0, 0, 0);
 
       const paidThisWeek = r.payments.some(p =>
