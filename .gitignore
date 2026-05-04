@@ -1,1 +1,12 @@
 node_modules
+
+# Environment
+.env
+.env.*
+
+# Mac
+.DS_Store
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
