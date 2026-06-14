@@ -44,17 +44,4 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ROTA TEMPORARIA DE RESET - REMOVER DEPOIS
-router.post('/temp-reset', async (req, res) => {
-  try {
-    const { secret, email, password } = req.body;
-    if (secret !== 'bonetti_reset_xyz789') return res.status(403).json({ error: 'Forbidden' });
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.update({ where: { email }, data: { password: hashed } });
-    res.json({ ok: true, email: user.email });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 module.exports = router;
